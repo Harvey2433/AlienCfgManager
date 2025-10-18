@@ -1,6 +1,10 @@
 ﻿using System.Text.Json;
 using System.Text.Encodings.Web;
 using System.Text.RegularExpressions;
+using System.Linq;
+using System.Collections.Generic;
+using System;
+using System.IO;
 
 // ===========================================
 // 数据模型
@@ -17,7 +21,215 @@ public class FeatureKeybind
 
     public string KeyType => IsHold ? "Hold" : "Toggle";
 
+    // 保持 ToString() 简洁，主要用于 JSON 序列化和简化数据结构
     public override string ToString() => $"{FeatureName,-25} | KeyCode: {KeyCode,-5} | Type: {KeyType}";
+}
+
+// ===========================================
+// 键代码转译模式
+// ===========================================
+public enum KeyMapMode
+{
+    /// <summary> GLFW 键码 (适用于新版 Minecraft 和您的模组正值) </summary>
+    GLFW,
+    /// <summary> 标准 ASCII/Windows VK 键码 (适用于低位冲突键码) </summary>
+    ASCII_VK
+}
+
+// ===========================================
+// 键代码转译辅助类 (已更新为双模式和104键)
+// ===========================================
+public static class KeyMapHelper
+{
+    // 完整的 GLFW Key Codes 映射
+    private static readonly Dictionary<int, string> GLFWKeyMap = new Dictionary<int, string>();
+    // 完整的 ASCII/Windows VK Key Codes 映射
+    private static readonly Dictionary<int, string> ASCIIKeyMap = new Dictionary<int, string>();
+
+    static KeyMapHelper()
+    {
+        // -----------------------------------
+        // GLFW KeyMap 初始化 (包含完整的 104 键)
+        // -----------------------------------
+
+        // A-Z (65 to 90) & 0-9 (48 to 57)
+        for (int i = 0; i < 26; i++) GLFWKeyMap.Add(65 + i, ((char)(65 + i)).ToString());
+        for (int i = 0; i < 10; i++) GLFWKeyMap.Add(48 + i, i.ToString());
+
+        // 主 GLFW 键 (高位键码)
+        GLFWKeyMap.Add(32, "SPACE");
+        GLFWKeyMap.Add(256, "ESCAPE");
+        GLFWKeyMap.Add(257, "ENTER");
+        GLFWKeyMap.Add(258, "TAB");
+        GLFWKeyMap.Add(259, "BACKSPACE");
+        GLFWKeyMap.Add(260, "INSERT");
+        GLFWKeyMap.Add(261, "DELETE");
+        GLFWKeyMap.Add(262, "RIGHT ARROW");
+        GLFWKeyMap.Add(263, "LEFT ARROW");
+        GLFWKeyMap.Add(264, "DOWN ARROW");
+        GLFWKeyMap.Add(265, "UP ARROW");
+        GLFWKeyMap.Add(266, "PAGE UP");
+        GLFWKeyMap.Add(267, "PAGE DOWN");
+        GLFWKeyMap.Add(268, "HOME");
+        GLFWKeyMap.Add(269, "END");
+        GLFWKeyMap.Add(280, "CAPS LOCK");
+        GLFWKeyMap.Add(281, "SCROLL LOCK");
+        GLFWKeyMap.Add(282, "NUM LOCK");
+        GLFWKeyMap.Add(283, "PRINT SCREEN");
+        GLFWKeyMap.Add(284, "PAUSE");
+
+        // 功能键 (F1 - F25)
+        for (int i = 0; i < 25; i++) GLFWKeyMap.Add(290 + i, $"F{i + 1}");
+
+        // 小键盘 (NUMPAD)
+        for (int i = 0; i < 10; i++) GLFWKeyMap.Add(320 + i, $"NUMPAD {i}");
+        GLFWKeyMap.Add(330, "NUMPAD DECIMAL");
+        GLFWKeyMap.Add(331, "NUMPAD DIVIDE");
+        GLFWKeyMap.Add(332, "NUMPAD MULTIPLY");
+        GLFWKeyMap.Add(333, "NUMPAD SUBTRACT");
+        GLFWKeyMap.Add(334, "NUMPAD ADD");
+        GLFWKeyMap.Add(335, "NUMPAD ENTER");
+        GLFWKeyMap.Add(336, "NUMPAD EQUAL"); // 可能的补充键
+
+        // 修饰键/控制键
+        GLFWKeyMap.Add(340, "LEFT SHIFT");
+        GLFWKeyMap.Add(341, "LEFT CONTROL");
+        GLFWKeyMap.Add(342, "LEFT ALT");
+        GLFWKeyMap.Add(343, "LEFT SUPER (WIN)"); // 补充
+        GLFWKeyMap.Add(344, "RIGHT SHIFT");
+        GLFWKeyMap.Add(345, "RIGHT CONTROL");
+        GLFWKeyMap.Add(346, "RIGHT ALT");
+        GLFWKeyMap.Add(347, "RIGHT SUPER (WIN)"); // 补充
+        GLFWKeyMap.Add(348, "MENU"); // 补充
+
+        // 符号键
+        GLFWKeyMap.Add(39, "APOSTROPHE (' \")");
+        GLFWKeyMap.Add(44, "COMMA (, <)");
+        GLFWKeyMap.Add(45, "MINUS (- _)");
+        GLFWKeyMap.Add(46, "PERIOD (. >)");
+        GLFWKeyMap.Add(47, "SLASH (/ ?)");
+        GLFWKeyMap.Add(59, "SEMICOLON (; :)");
+        GLFWKeyMap.Add(61, "EQUAL (= +)");
+        GLFWKeyMap.Add(91, "LEFT BRACKET ([ {)");
+        GLFWKeyMap.Add(92, "BACKSLASH (\\ |)");
+        GLFWKeyMap.Add(93, "RIGHT BRACKET (] })");
+        GLFWKeyMap.Add(96, "GRAVE ACCENT (` ~)");
+
+        // -----------------------------------
+        // ASCII / Windows VK KeyMap 初始化 (包含完整的 104 键常用 VK Codes)
+        // -----------------------------------
+        // A-Z (65 to 90) & 0-9 (48 to 57)
+        for (int i = 0; i < 26; i++) ASCIIKeyMap.Add(65 + i, ((char)(65 + i)).ToString());
+        for (int i = 0; i < 10; i++) ASCIIKeyMap.Add(48 + i, i.ToString());
+
+        // 鼠标 (VK Codes 1, 2, 4-6)
+        ASCIIKeyMap.Add(1, "MOUSE1 (L)");
+        ASCIIKeyMap.Add(2, "MOUSE2 (R)");
+        ASCIIKeyMap.Add(4, "MOUSE3 (M)");
+        ASCIIKeyMap.Add(5, "MOUSE4 (X1)");
+        ASCIIKeyMap.Add(6, "MOUSE5 (X2)");
+
+        // 主要控制键 (VK Codes)
+        ASCIIKeyMap.Add(8, "BACKSPACE");
+        ASCIIKeyMap.Add(9, "TAB");
+        // ASCIIKeyMap.Add(12, "CLEAR"); // NumPad 5
+        ASCIIKeyMap.Add(13, "ENTER");
+
+        // Modifiers & System
+        ASCIIKeyMap.Add(16, "SHIFT (Any)");
+        ASCIIKeyMap.Add(17, "CONTROL (Any)");
+        ASCIIKeyMap.Add(18, "ALT (Any)");
+        ASCIIKeyMap.Add(19, "PAUSE");
+        ASCIIKeyMap.Add(20, "CAPS LOCK");
+        ASCIIKeyMap.Add(27, "ESCAPE");
+        ASCIIKeyMap.Add(32, "SPACE");
+
+        // Navigation / Editting
+        ASCIIKeyMap.Add(33, "PAGE UP");
+        ASCIIKeyMap.Add(34, "PAGE DOWN");
+        ASCIIKeyMap.Add(35, "END");
+        ASCIIKeyMap.Add(36, "HOME");
+        ASCIIKeyMap.Add(37, "LEFT ARROW");
+        ASCIIKeyMap.Add(38, "UP ARROW");
+        ASCIIKeyMap.Add(39, "RIGHT ARROW");
+        ASCIIKeyMap.Add(40, "DOWN ARROW");
+        ASCIIKeyMap.Add(44, "PRINT SCREEN");
+        ASCIIKeyMap.Add(45, "INSERT");
+        ASCIIKeyMap.Add(46, "DELETE");
+
+        // Windows Key
+        ASCIIKeyMap.Add(91, "LEFT WIN");
+        ASCIIKeyMap.Add(92, "RIGHT WIN");
+        ASCIIKeyMap.Add(93, "APPLICATIONS");
+
+        // Numpad Keys
+        ASCIIKeyMap.Add(96, "NUMPAD 0");
+        ASCIIKeyMap.Add(97, "NUMPAD 1");
+        ASCIIKeyMap.Add(98, "NUMPAD 2");
+        ASCIIKeyMap.Add(99, "NUMPAD 3");
+        ASCIIKeyMap.Add(100, "NUMPAD 4");
+        ASCIIKeyMap.Add(101, "NUMPAD 5");
+        ASCIIKeyMap.Add(102, "NUMPAD 6");
+        ASCIIKeyMap.Add(103, "NUMPAD 7");
+        ASCIIKeyMap.Add(104, "NUMPAD 8");
+        ASCIIKeyMap.Add(105, "NUMPAD 9");
+        ASCIIKeyMap.Add(106, "MULTIPLY (*)");
+        ASCIIKeyMap.Add(107, "ADD (+)");
+        ASCIIKeyMap.Add(108, "SEPARATOR");
+        ASCIIKeyMap.Add(109, "SUBTRACT (-)");
+        ASCIIKeyMap.Add(110, "DECIMAL (.)");
+        ASCIIKeyMap.Add(111, "DIVIDE (/)");
+
+        // F1-F24 (VK codes)
+        for (int i = 0; i < 24; i++) ASCIIKeyMap.Add(112 + i, $"F{i + 1}");
+
+        // Lock Keys
+        ASCIIKeyMap.Add(144, "NUM LOCK");
+        ASCIIKeyMap.Add(145, "SCROLL LOCK");
+
+        // Symbol Keys (VK Codes 186-222)
+        ASCIIKeyMap.Add(186, "; / :");
+        ASCIIKeyMap.Add(187, "= / +");
+        ASCIIKeyMap.Add(188, ", / <");
+        ASCIIKeyMap.Add(189, "- / _");
+        ASCIIKeyMap.Add(190, ". / >");
+        ASCIIKeyMap.Add(191, "/ / ?");
+        ASCIIKeyMap.Add(192, "` / ~");
+        ASCIIKeyMap.Add(219, "[ / {");
+        ASCIIKeyMap.Add(220, "\\ / |");
+        ASCIIKeyMap.Add(221, "] / }");
+        ASCIIKeyMap.Add(222, "' / \"");
+    }
+
+    /// <summary> 根据键代码和模式获取按键名称 </summary>
+    public static string GetKeyName(int keyCode, KeyMapMode mode)
+    {
+        if (keyCode == -1)
+        {
+            return "NONE";
+        }
+
+        // 1. 模组自定义负值键码 (始终优先处理，与模式无关)
+        if (keyCode < -1)
+        {
+            if (keyCode == -2) return "MOUSE LEFT";
+            if (keyCode == -3) return "MOUSE RIGHT";
+            if (keyCode == -4) return "MOUSE MIDDLE";
+            // 鼠标键 4, 5, 6... (Math.Abs(keyCode) - 4)
+            return "MOUSE " + (Math.Abs(keyCode) - 4);
+        }
+
+        // 2. 正值键码 (根据模式转译)
+        Dictionary<int, string> map = mode == KeyMapMode.GLFW ? GLFWKeyMap : ASCIIKeyMap;
+
+        if (map.TryGetValue(keyCode, out string? keyName))
+        {
+            return keyName;
+        }
+
+        // 3. Fallback: 无法转译
+        return $"[Code:{keyCode}]";
+    }
 }
 
 // ===========================================
@@ -28,6 +240,8 @@ public class ConfigManager
     private Dictionary<string, string> _fullConfig = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
     private const string KeySuffix = "_Key";
     private const string HoldSuffix = "_Key_hold";
+
+    // ... (LoadConfig, ExtractKeybinds, ExportKeybindsToJson, ImportKeybindsFromJson, OverwriteConfig, ExportModifiedConfig 保持不变)
 
     /// <summary> 读取 CFG 文件并加载所有配置, 增加进度显示 </summary>
     public bool LoadConfig(string filePath)
@@ -122,7 +336,7 @@ public class ConfigManager
     {
         try
         {
-            // 关键修复: 确保中文直接输出, 而非转义
+            // 确保中文直接输出, 而非转义
             var options = new JsonSerializerOptions
             {
                 WriteIndented = true,
@@ -236,6 +450,135 @@ public class ConfigManager
             ConsoleHelper.Error($"导出修改后的 CFG 文件失败: {ex.Message}");
         }
     }
+
+
+    /// <summary> 整理所有Key不为-1的功能项，并在控制台输出，同时提供模式切换和文件写入选项 </summary>
+    public void ExportActiveKeybindsToText(List<FeatureKeybind> keybinds, string exportFileName, string currentCfgName)
+    {
+        ConsoleHelper.Info("开始整理并导出已绑定的功能模块...");
+
+        // 筛选 KeyCode 不为 -1 的项，并按功能名排序
+        var activeKeybinds = keybinds.Where(k => k.KeyCode != -1).OrderBy(k => k.FeatureName).ToList();
+
+        if (activeKeybinds.Count == 0)
+        {
+            ConsoleHelper.Error("未找到任何已绑定的功能模块 (KeyCode 不为 -1)");
+            return;
+        }
+
+        KeyMapMode currentMode = KeyMapMode.GLFW; // 默认模式为 GLFW
+        List<string> outputLines = new List<string>();
+        bool interactiveLoop = true;
+
+        while (interactiveLoop)
+        {
+            // 清空控制台并重新显示标题和状态
+            ConsoleHelper.ClearScreen();
+            ConsoleHelper.ShowStatus($"{Path.GetFileName(currentCfgName)} (活动键位输出)", ConsoleColor.Green);
+
+            // 1. 准备文本内容
+            const int TotalWidth = 84;
+
+            outputLines.Clear(); // 清空上次循环的输出内容
+            outputLines.Add(new string('=', TotalWidth));
+            outputLines.Add($"  活动功能模块列表 (Key != -1) - 数量: {activeKeybinds.Count}  ");
+            outputLines.Add($"  当前转译模式: {currentMode}  ");
+            outputLines.Add(new string('=', TotalWidth));
+            outputLines.Add($"{"功能模块名",-25} | {"键值",-10} | {"按键名称",-20} | 类型");
+            outputLines.Add(new string('-', TotalWidth));
+
+            int untranslatedCount = 0;
+
+            foreach (var keybind in activeKeybinds)
+            {
+                // 获取转译后的按键名称，使用当前模式
+                string keyName = KeyMapHelper.GetKeyName(keybind.KeyCode, currentMode);
+
+                if (keyName.StartsWith("[Code:"))
+                {
+                    untranslatedCount++;
+                }
+
+                // 格式化输出行
+                string line = $"{keybind.FeatureName,-25} | {keybind.KeyCode,-10} | {keyName,-20} | {keybind.KeyType}";
+                outputLines.Add(line);
+            }
+            outputLines.Add(new string('=', TotalWidth));
+
+            // 2. 输出到控制台
+            ConsoleHelper.Info("\n[已绑定的功能模块列表]:");
+            foreach (var line in outputLines)
+            {
+                // 突出显示实际的 Keybinds
+                if (!line.StartsWith("=") && !line.StartsWith("-") && !line.Contains("模块名") && !line.Contains("当前转译模式:"))
+                {
+                    // 对未转译的键码使用红色突出显示
+                    if (line.Contains("[Code:"))
+                    {
+                        Console.ForegroundColor = ConsoleColor.Red;
+                    }
+                    else
+                    {
+                        Console.ForegroundColor = ConsoleColor.Yellow;
+                    }
+                    Console.WriteLine(line);
+                    Console.ForegroundColor = ConsoleColor.Gray;
+                }
+                else
+                {
+                    Console.WriteLine(line);
+                }
+            }
+
+            // 3. 交互式菜单
+            ConsoleHelper.DrawSeparator();
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.WriteLine("请选择操作：");
+            Console.ForegroundColor = ConsoleColor.Gray;
+            Console.WriteLine($" [M] 切换转译模式 (当前: {currentMode}，{(currentMode == KeyMapMode.GLFW ? "切换到ASCII/VK" : "切换到GLFW")})");
+            Console.WriteLine($" [W] 写入当前列表到文件 ({exportFileName}) 并返回主菜单");
+            Console.WriteLine(" [B] 返回主菜单 (不写入文件)");
+            ConsoleHelper.DrawSeparator();
+            Console.Write("请输入选项: ");
+
+            string? choice = Console.ReadLine()?.Trim().ToUpper();
+
+            if (choice == "W")
+            {
+                interactiveLoop = false;
+                break; // 跳出循环执行文件写入
+            }
+            else if (choice == "M")
+            {
+                currentMode = currentMode == KeyMapMode.GLFW ? KeyMapMode.ASCII_VK : KeyMapMode.GLFW;
+                ConsoleHelper.Info($"模式已切换到 {currentMode}，正在重新转译并显示...");
+                System.Threading.Thread.Sleep(500); // 暂停一下以便用户看到提示
+                continue; // 重新开始循环，用新模式显示
+            }
+            else if (choice == "B")
+            {
+                ConsoleHelper.Info("操作已取消，返回主菜单。");
+                return; // 直接返回，不执行文件写入
+            }
+            else
+            {
+                ConsoleHelper.Error("无效的选项，请重新输入。");
+                ConsoleHelper.Pause(); // 暂停一下以便用户看到错误信息
+            }
+        }
+
+        // 4. 输出到文件 (只有在 'W' 被选择时才会执行到这里)
+        try
+        {
+            File.WriteAllLines(exportFileName, outputLines);
+            ConsoleHelper.Success($"\n 活跃模块列表已成功导出");
+            ConsoleHelper.Info($"文本文件路径：{Path.GetFullPath(exportFileName)}");
+        }
+        catch (Exception ex)
+        {
+            ConsoleHelper.Error($"导出文本文件失败: {ex.Message}");
+        }
+    }
 }
 
 // ===========================================
@@ -256,7 +599,7 @@ public static class ConsoleHelper
     {
         Console.ForegroundColor = AccentColor;
         Console.WriteLine("======================================================");
-        Console.WriteLine("          AlienCfgManager (C# .NET 7.0)               ");
+        Console.WriteLine("                AlienCfgManager                       ");
         Console.WriteLine("======================================================");
         Console.ForegroundColor = DefaultColor;
         Console.WriteLine();
@@ -333,13 +676,16 @@ public static class ConsoleHelper
                 continue;
             }
 
+            // 修正：移除路径两侧的双引号
+            fileName = fileName.Trim('"');
+
             if (allowedExtensions.Length > 0)
             {
                 bool isValid = allowedExtensions.Any(ext => fileName.EndsWith(ext, StringComparison.OrdinalIgnoreCase));
 
                 if (!isValid)
                 {
-                    Error($"文件扩展名必须是 {allowedExtsPrompt}请重新输入或输入 exit 退出");
+                    Error($"文件扩展名必须是 {allowedExtsPrompt}，请重新输入或输入 exit 退出。");
                     continue;
                 }
             }
@@ -397,8 +743,10 @@ public class Program
             Console.WriteLine(" [1] 载入待修改的配置文件 (.cfg/.txt)");
             if (currentCfgFile != null)
             {
-                Console.WriteLine(" [2] 提取键值数据并导出");
-                Console.WriteLine(" [3] 导入键值数据覆盖并导出");
+                Console.WriteLine(" [2] 提取键值数据并导出 (.json)");
+                Console.WriteLine(" [3] 导入键值数据覆盖并导出 (.cfg/.txt)");
+                // 新增选项
+                Console.WriteLine(" [4] 整理并导出已绑定功能模块");
             }
             Console.WriteLine(" [exit] 退出程序");
 
@@ -430,7 +778,7 @@ public class Program
                     ConsoleHelper.Error("配置文件载入失败");
                 }
             }
-            // --- 选项 2 & 3 必须在载入 CFG 后才能执行 ---
+            // --- 选项 2, 3, 4 必须在载入 CFG 后才能执行 ---
             else if (currentCfgFile == null)
             {
                 ConsoleHelper.Error("请先选择 [1] 载入一个配置文件才能进行后续操作");
@@ -494,6 +842,22 @@ public class Program
                     {
                         manager.ExportModifiedConfig(exportCfgFile);
                     }
+                }
+            }
+            // --- 选项 4: 导出活跃功能模块 (新增交互逻辑) ---
+            else if (choice == "4")
+            {
+                // 1. 提取所有键位绑定 (必须先有数据才能筛选)
+                var keybinds = manager.ExtractKeybinds();
+
+                if (keybinds.Count > 0)
+                {
+                    // 2. 导出活跃模块到控制台和文件 (包含切换模式和写入逻辑)
+                    manager.ExportActiveKeybindsToText(keybinds, "activitymodule.txt", currentCfgFile);
+                }
+                else
+                {
+                    ConsoleHelper.Error("未提取到任何键位绑定, 操作终止");
                 }
             }
             else

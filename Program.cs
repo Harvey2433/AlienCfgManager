@@ -44,7 +44,7 @@ public class KeybindComparer : IEqualityComparer<FeatureKeybind>
 }
 
 /// <summary>
-/// 专用于对比结果的数据模型，记录独有模块及其来源
+/// 专用于对比结果的数据模型, 记录独有模块及其来源
 /// </summary>
 public class UniqueKeybind
 {
@@ -121,7 +121,7 @@ public static class KeyboardNative
     /// <summary> 检查特定虚拟键是否处于按下状态 </summary>
     public static bool IsKeyPressed(int vKey)
     {
-        // 如果最高位为 1 (即 0x8000)，则表示键在调用时是按下的
+        // 如果最高位为 1 (即 0x8000), 则表示键在调用时是按下的
         return (GetAsyncKeyState(vKey) & 0x8000) != 0;
     }
 }
@@ -225,7 +225,7 @@ public static class KeyMapHelper
         ASCIIKeyMap.Add(13, "ENTER");
 
         // Modifiers & System (包含 L/R 区分)
-        // 注意：VK 16-18 是 Any Shift/Ctrl/Alt，但我们依赖 P/Invoke 捕获 L/R 版本的 160-165
+        // 注意：VK 16-18 是 Any Shift/Ctrl/Alt, 但我们依赖 P/Invoke 捕获 L/R 版本的 160-165
         ASCIIKeyMap.Add(KeyboardNative.VK_LSHIFT, "LEFT SHIFT"); // 160
         ASCIIKeyMap.Add(KeyboardNative.VK_RSHIFT, "RIGHT SHIFT"); // 161
         ASCIIKeyMap.Add(KeyboardNative.VK_LCONTROL, "LEFT CONTROL"); // 162
@@ -303,7 +303,7 @@ public static class KeyMapHelper
             return "NONE";
         }
 
-        // 1. 模组自定义负值键码 (始终优先处理，与模式无关)
+        // 1. 模组自定义负值键码 (始终优先处理, 与模式无关)
         if (keyCode < -1)
         {
             if (keyCode == -2) return "MOUSE LEFT";
@@ -583,7 +583,7 @@ public class ConfigManager
     // ===========================================
 
     /// <summary> 
-    /// 比较当前配置和另一个配置，找出双向独有的活跃模块。
+    /// 比较当前配置和另一个配置, 找出双向独有的活跃模块
     /// </summary>
     public KeybindComparisonResult CompareActiveKeybinds(ConfigManager otherManager, string mainCfgName, string compareCfgName)
     {
@@ -597,7 +597,7 @@ public class ConfigManager
         var thisActiveNames = thisActiveKeybinds.Select(k => k.FeatureName).ToHashSet(StringComparer.OrdinalIgnoreCase);
         var otherActiveNames = otherActiveKeybinds.Select(k => k.FeatureName).ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-        // 3. 找出【对比配置】独有的模块 (在对比中，不在主配置中)
+        // 3. 找出【对比配置】独有的模块 (在对比中, 不在主配置中)
         var uniqueToCompare = otherActiveKeybinds
             .Where(k => !thisActiveNames.Contains(k.FeatureName))
             .Select(k => new UniqueKeybind
@@ -608,7 +608,7 @@ public class ConfigManager
             .OrderBy(uk => uk.Keybind.FeatureName)
             .ToList();
 
-        // 4. 找出【主配置】独有的模块 (在主配置中，不在对比中)
+        // 4. 找出【主配置】独有的模块 (在主配置中, 不在对比中)
         var uniqueToMain = thisActiveKeybinds
             .Where(k => !otherActiveNames.Contains(k.FeatureName))
             .Select(k => new UniqueKeybind
@@ -619,7 +619,7 @@ public class ConfigManager
             .OrderBy(uk => uk.Keybind.FeatureName)
             .ToList();
 
-        ConsoleHelper.Success($"[对比完成] 发现 主配置独有 {uniqueToMain.Count} 个，对比配置独有 {uniqueToCompare.Count} 个。");
+        ConsoleHelper.Success($"[对比完成] 发现 主配置独有 {uniqueToMain.Count} 个, 对比配置独有 {uniqueToCompare.Count} 个");
 
         return new KeybindComparisonResult
         {
@@ -637,7 +637,7 @@ public class ConfigManager
 
         if (totalUnique == 0)
         {
-            ConsoleHelper.Error("[无结果] 未找到互相独有的模块。");
+            ConsoleHelper.Error("[无结果] 未找到互相独有的模块");
             return;
         }
 
@@ -690,7 +690,7 @@ public class ConfigManager
             );
 
             // 3. 输出到控制台
-            ConsoleHelper.Info($"\n[双向独有模块列表 - 总数: {totalUnique}，当前转译模式: {currentMode}]:");
+            ConsoleHelper.Info($"\n[双向独有模块列表 - 总数: {totalUnique}, 当前转译模式: {currentMode}]:");
             foreach (var line in outputLines)
             {
                 // 突出显示实际的 Keybinds
@@ -748,23 +748,23 @@ public class ConfigManager
             }
             else if (choice == "B")
             {
-                ConsoleHelper.Info("[操作取消] 返回主菜单。");
+                ConsoleHelper.Info("[操作取消] 返回主菜单");
                 return;
             }
             else
             {
-                ConsoleHelper.Error("[无效选项] 请重新输入。");
+                ConsoleHelper.Error("[无效选项] 请重新输入");
                 ConsoleHelper.Pause();
             }
         }
     }
 
-    /// <summary> 整理所有Key不为-1的功能项，并在控制台输出，同时提供模式切换和文件写入选项 </summary>
+    /// <summary> 整理所有Key不为-1的功能项, 并在控制台输出, 同时提供模式切换和文件写入选项 </summary>
     public void ExportActiveKeybindsToText(List<FeatureKeybind> keybinds, string exportFileName, string currentCfgName)
     {
         ConsoleHelper.Info("开始整理并导出已绑定的功能模块...");
 
-        // 筛选 KeyCode 不为 -1 的项，并按功能名排序
+        // 筛选 KeyCode 不为 -1 的项, 并按功能名排序
         var activeKeybinds = keybinds.Where(k => k.KeyCode != -1).OrderBy(k => k.FeatureName).ToList();
 
         if (activeKeybinds.Count == 0)
@@ -864,12 +864,12 @@ public class ConfigManager
             }
             else if (choice == "B")
             {
-                ConsoleHelper.Info("[操作取消] 返回主菜单。");
+                ConsoleHelper.Info("[操作取消] 返回主菜单");
                 return;
             }
             else
             {
-                ConsoleHelper.Error("[无效选项] 请重新输入。");
+                ConsoleHelper.Error("[无效选项] 请重新输入");
                 ConsoleHelper.Pause();
             }
         }
@@ -896,7 +896,7 @@ public class ConfigManager
 
         if (allKeybinds.Count == 0)
         {
-            ConsoleHelper.Error("[微调失败] 当前配置中没有键位可供微调。");
+            ConsoleHelper.Error("[微调失败] 当前配置中没有键位可供微调");
             return 0;
         }
 
@@ -941,12 +941,12 @@ public class ConfigManager
             }
             else if (option == "B")
             {
-                ConsoleHelper.Info($"[操作取消] 微调结束，共修改 {modificationsMade} 项。返回主菜单。");
+                ConsoleHelper.Info($"[操作取消] 微调结束, 共修改 {modificationsMade} 项返回主菜单");
                 return modificationsMade;
             }
             else if (option != "C")
             {
-                ConsoleHelper.Error("[无效选项] 请重新输入。");
+                ConsoleHelper.Error("[无效选项] 请重新输入");
                 ConsoleHelper.Pause();
                 continue;
             }
@@ -968,7 +968,7 @@ public class ConfigManager
 
                 if (targetKeybind == null)
                 {
-                    ConsoleHelper.Error($"[输入错误] 模块名 '{featureName}' 不存在。");
+                    ConsoleHelper.Error($"[输入错误] 模块名 '{featureName}' 不存在");
                 }
             }
 
@@ -980,7 +980,7 @@ public class ConfigManager
             {
                 ConsoleHelper.DrawSeparator();
                 ConsoleHelper.Warning($"[目标模块] {targetKeybind.FeatureName} | 旧键: {KeyMapHelper.GetKeyName(targetKeybind.KeyCode, currentMode)} ({targetKeybind.KeyCode})");
-                ConsoleHelper.Info("请按下新的目标键位 (或输入 B 返回，输入 Enter 键保留): ");
+                ConsoleHelper.Info("请按下新的目标键位 (或输入 B 返回, 输入 Enter 键保留): ");
 
                 // 捕获按键
                 var result = ConsoleHelper.ReadUserKey(currentMode);
@@ -989,10 +989,10 @@ public class ConfigManager
 
                 if (newKeyCode == -999) // 哨兵值：B 返回
                 {
-                    ConsoleHelper.Info("[操作取消] 取消修改此模块。");
+                    ConsoleHelper.Info("[操作取消] 取消修改此模块");
                     goto NextModule; // 跳到外部循环的 NextModule 标签
                 }
-                if (newKeyCode == -1000) // 哨兵值：捕获失败，重试
+                if (newKeyCode == -1000) // 哨兵值：捕获失败, 重试
                 {
                     continue;
                 }
@@ -1004,21 +1004,21 @@ public class ConfigManager
 
                 if (confirm == "Y")
                 {
-                    break; // 确认修改，进入步骤 4
+                    break; // 确认修改, 进入步骤 4
                 }
                 else if (confirm == "N")
                 {
-                    ConsoleHelper.Info("[键位丢弃] 请重新按下目标键。");
+                    ConsoleHelper.Info("[键位丢弃] 请重新按下目标键");
                     continue;
                 }
                 else if (confirm == "C")
                 {
-                    ConsoleHelper.Info("[操作取消] 跳过此模块，继续下一个模块微调。");
+                    ConsoleHelper.Info("[操作取消] 跳过此模块, 继续下一个模块微调");
                     goto NextModule;
                 }
                 else
                 {
-                    ConsoleHelper.Error("[输入错误] 输入无效，请重新操作。");
+                    ConsoleHelper.Error("[输入错误] 输入无效, 请重新操作");
                 }
             }
 
@@ -1038,12 +1038,12 @@ public class ConfigManager
                     NewKeyCode = newKeyCode
                 });
 
-                ConsoleHelper.Success($"\n[修改成功] 模块 '{targetKeybind.FeatureName}' 的键位已成功修改为 {newKeyName} ({newKeyCode})。");
+                ConsoleHelper.Success($"\n[修改成功] 模块 '{targetKeybind.FeatureName}' 的键位已成功修改为 {newKeyName} ({newKeyCode})");
                 modificationsMade++;
             }
             else
             {
-                ConsoleHelper.Error("[修改失败] 在配置字典中找不到该模块的键位条目。");
+                ConsoleHelper.Error("[修改失败] 在配置字典中找不到该模块的键位条目");
             }
 
         // 标签用于跳过此模块的后续操作
@@ -1071,8 +1071,8 @@ public static class ConsoleHelper
     {
         Console.ForegroundColor = AccentColor;
         Console.WriteLine("======================================================");
-        Console.WriteLine("                AlienCfgManager V2.0                  ");
-        Console.WriteLine("                CFG 键位管理工具                      ");
+        Console.WriteLine("                 AlienCfgManager v2                   ");
+        Console.WriteLine("                by Maple Bamboo Team                  ");
         Console.WriteLine("======================================================");
         Console.ForegroundColor = DefaultColor;
         Console.WriteLine();
@@ -1103,7 +1103,7 @@ public static class ConsoleHelper
 
     public static void Warning(string message)
     {
-        // [WARN] 是标准前缀，不应移除
+        // [WARN] 是标准前缀, 不应移除
         Console.ForegroundColor = ConsoleColor.Yellow;
         Console.WriteLine($"[WARN] {message}");
         Console.ForegroundColor = DefaultColor;
@@ -1160,7 +1160,7 @@ public static class ConsoleHelper
 
             if (string.IsNullOrWhiteSpace(fileName))
             {
-                Error("文件名不能为空请重新输入或输入 exit 退出。");
+                Error("文件名不能为空请重新输入或输入 exit 退出");
                 continue;
             }
 
@@ -1179,7 +1179,7 @@ public static class ConsoleHelper
 
                 if (!isValid)
                 {
-                    Error($"文件扩展名必须是 {allowedExtsPrompt}，请重新输入或输入 exit 退出。");
+                    Error($"文件扩展名必须是 {allowedExtsPrompt}, 请重新输入或输入 exit 退出");
                     continue;
                 }
             }
@@ -1200,7 +1200,7 @@ public static class ConsoleHelper
     }
 
     /// <summary> 
-    /// 尝试使用 P/Invoke 检测 L/R 修饰键或锁键是否被按下。
+    /// 尝试使用 P/Invoke 检测 L/R 修饰键或锁键是否被按下
     /// </summary>
     private static bool HandleModifierKeyPInvoke(KeyMapMode mode, out int keyCode)
     {
@@ -1256,7 +1256,7 @@ public static class ConsoleHelper
         return false;
     }
 
-    /// <summary> 捕获用户按键并映射到 KeyCode，同时支持手动输入 KeyCode </summary>
+    /// <summary> 捕获用户按键并映射到 KeyCode, 同时支持手动输入 KeyCode </summary>
     public static (int code, string name) ReadUserKey(KeyMapMode mode)
     {
         // P/Invoke 捕获修饰键 (P/Invoke 优先)
@@ -1350,12 +1350,12 @@ public static class ConsoleHelper
                 case ConsoleKey.Divide: keyCode = mode == KeyMapMode.GLFW ? 331 : 111; break; // /
 
                 default:
-                    // Fallback: 无法识别，要求用户手动输入
-                    Warning($"无法通过按键捕获特殊键 [{keyInfo.Key}]。请手动输入 KeyCode 或按 Enter 键取消:");
+                    // Fallback: 无法识别, 要求用户手动输入
+                    Warning($"无法通过按键捕获特殊键 [{keyInfo.Key}]. 请手动输入 KeyCode 或按 Enter 键取消:");
                     string? manualInput = Console.ReadLine();
                     if (string.IsNullOrWhiteSpace(manualInput))
                     {
-                        // 用户按了 Enter 或输入空白，返回失败重试
+                        // 用户按了 Enter 或输入空白, 返回失败重试
                         return (-1000, "FAILED_RETRY");
                     }
                     if (int.TryParse(manualInput, out int manualCode))
@@ -1364,7 +1364,7 @@ public static class ConsoleHelper
                     }
                     else
                     {
-                        Error("无效输入，按键捕获失败，请重试。");
+                        Error("无效输入, 按键捕获失败, 请重试");
                         return (-1000, "FAILED_RETRY");
                     }
                     break;
@@ -1386,7 +1386,7 @@ public class Program
     public static void Main(string[] args)
     {
         Console.OutputEncoding = System.Text.Encoding.UTF8;
-        Console.Title = "AlienCfgManager CFG 键位管理工具 - UI Enhanced";
+        Console.Title = "AlienCfgManager 2.0";
         var mainManager = new ConfigManager();
         var compareManager = new ConfigManager();
         string? currentCfgFile = null;
@@ -1478,14 +1478,14 @@ public class Program
                 {
                     currentCfgFile = newCfgFile;
 
-                    // 优化逻辑: 载入主配置后清除对比配置，避免混淆
+                    // 优化逻辑: 载入主配置后清除对比配置, 避免混淆
                     compareCfgFile = null;
                     compareManager.ClearConfig();
 
                     // 仅在对比配置确实被载入过时才显示警告
                     if (wasCompareConfigLoaded)
                     {
-                        ConsoleHelper.Warning("对比配置文件已自动清除。");
+                        ConsoleHelper.Warning("对比配置文件已自动清除");
                     }
                 }
             }
@@ -1494,7 +1494,7 @@ public class Program
             {
                 if (currentCfgFile == null)
                 {
-                    ConsoleHelper.Error("[前置条件] 请先载入主配置文件 (选项 1)。");
+                    ConsoleHelper.Error("[前置条件] 请先载入主配置文件 (选项 1)");
                 }
                 else
                 {
@@ -1591,7 +1591,7 @@ public class Program
             {
                 if (compareCfgFile == null)
                 {
-                    ConsoleHelper.Error("[前置条件] 请先选择 [5] 载入一个对比配置文件。");
+                    ConsoleHelper.Error("[前置条件] 请先选择 [5] 载入一个对比配置文件");
                 }
                 else
                 {
@@ -1612,7 +1612,7 @@ public class Program
                 }
                 else
                 {
-                    ConsoleHelper.Error("[前置条件] 主配置文件未载入。");
+                    ConsoleHelper.Error("[前置条件] 主配置文件未载入");
                 }
             }
             else
